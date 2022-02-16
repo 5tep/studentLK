@@ -28,23 +28,16 @@ class AuthManager extends \yii\base\Component
                 ->send();
             if ($response->isOk) {
                 $access_token = $response->data['access_token'];
-                $response_admin = $ADauth->createRequest()
-                ->setMethod('post')
-                ->setUrl('/realms/master/protocol/openid-connect/token')
-                ->setData(['grant_type' => 'password', 'username' => 'admin', 'password' => 'Admin@123', 'client_id' => 'admin-cli', 'client_secret' => 'jPZPsFE21Vsx57yAVOBMfzcTHcNXBMf8'])
-                ->send();
-                if ($response->isOk) {
-                    $admin_token = $response_admin->data['access_token'];
-                    $get_user = $ADauth->createRequest()
+                $get_user = $ADauth->createRequest()
                     ->setFormat(Client::FORMAT_JSON)
                     ->setMethod('get')
-                    ->setUrl('/admin/realms/PortalSEVSU/users?username='.$login)
-                    ->addHeaders(['Authorization' => 'Bearer ' . $admin_token])
+                    ->setUrl('/realms/PortalSEVSU/protocol/openid-connect/userinfo')
+                    ->addHeaders(['Authorization' => 'Bearer ' . $access_token])
                     ->send();
                     if ($get_user->isOk) {
-                        $fio = $get_user->data[0]['lastName'] . ' ' . $get_user->data[0]['firstName'];
-                        $email = $get_user->data[0]['email'];
-                        $LDAP_ENTRY_DN = $get_user->data[0]['attributes']['LDAP_ENTRY_DN'];
+                        $fio = $get_user->data['family_name'] . ' ' . $get_user->data['given_name'];
+                        $email = $get_user->data['email'];
+                        //$LDAP_ENTRY_DN = $get_user->data['attributes']['LDAP_ENTRY_DN'];
                         $UserId = '00-054216';
                         $response = Yii::$app->soapClientStudent->load("GetUsers");
                         foreach ($response->return->User as $user) {
@@ -56,7 +49,7 @@ class AuthManager extends \yii\base\Component
                         }
                     }
                     $this->setRoles($roles, $UserId);
-                }
+                
             return $data;
             } 
             else {
