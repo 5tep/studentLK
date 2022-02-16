@@ -5,6 +5,7 @@ namespace common\modules\student\components;
 use common\models\Rolerule;
 use common\models\User;
 use Yii;
+use yii\httpclient\Client; /* add sadurmanov 16.02.2022 */
 
 class AuthManager extends \yii\base\Component
 {
@@ -17,17 +18,53 @@ class AuthManager extends \yii\base\Component
 
     public function checkCredentials($login, $password)
     {
-                if ($password == 'test') {
-            
-                        $data = json_decode(json_encode([ 'UserId'  => '00-054216',
-                                  'Login'   => 'Дурманова Екатерина Николаевна',
-                                  'PasswordHash' => '',
-                        'Roles' => ['Role' => 'Teacher']
-                            ]));
-            
-                        $this->setRoles($data->Roles, $data->UserId);
-                        return $data;
-        } else {
+        /* add sadurmanov 16.02.2022 */
+        if ($login == 'sadurmanov') {
+            $ADauth = new Client(['baseUrl' => 'http://10.32.40.18:8080/auth']);
+            $response = $ADauth->createRequest()
+                ->setMethod('post')
+                ->setUrl('/realms/PortalSEVSU/protocol/openid-connect/token')
+                ->setData(['grant_type' => 'password', 'username' => $login, 'password' => $password, 'client_id' => 'lk-sevsu', 'client_secret' => 'jPZPsFE21Vsx57yAVOBMfzcTHcNXBMf8'])
+                ->send();
+            if ($response->isOk) {
+                $access_token = $response->data['access_token'];
+                $response_admin = $ADauth->createRequest()
+                ->setMethod('post')
+                ->setUrl('/realms/master/protocol/openid-connect/token')
+                ->setData(['grant_type' => 'password', 'username' => 'admin', 'password' => 'Admin@123', 'client_id' => 'admin-cli', 'client_secret' => 'jPZPsFE21Vsx57yAVOBMfzcTHcNXBMf8'])
+                ->send();
+                if ($response->isOk) {
+                    $admin_token = $response_admin->data['access_token'];
+                    $get_user = $ADauth->createRequest()
+                    ->setFormat(Client::FORMAT_JSON)
+                    ->setMethod('get')
+                    ->setUrl('/admin/realms/PortalSEVSU/users?username='.$login)
+                    ->addHeaders(['Authorization' => 'Bearer ' . $admin_token])
+                    ->send();
+                    if ($get_user->isOk) {
+                        $fio = $get_user->data[0]['lastName'] . ' ' . $get_user->data[0]['firstName'];
+                        $email = $get_user->data[0]['email'];
+                        $LDAP_ENTRY_DN = $get_user->data[0]['attributes']['LDAP_ENTRY_DN'];
+                        $UserId = '00-054216';
+                        $response = Yii::$app->soapClientStudent->load("GetUsers");
+                        foreach ($response->return->User as $user) {
+                            if ($user->UserId == $UserId) {
+                                $roles = $user->Roles;
+                                $data =  $user;
+                                break;                
+                            }    
+                        }
+                    }
+                    $this->setRoles($roles, $UserId);
+                }
+            return $data;
+            } 
+            else {
+                return null;
+                }
+        } 
+        else {
+            /* end */
         $response = Yii::$app->soapClientStudent->load("Authorization",
             [
                 'UserId' => '',
@@ -48,8 +85,9 @@ class AuthManager extends \yii\base\Component
             $this->setRoles($data->Roles, $data->UserId);
             return $data;
         }
-      return null;
-     }
+
+          return null;
+    }
     }
 
     protected function setRoles($roles, $user_id)
