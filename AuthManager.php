@@ -18,8 +18,10 @@ class AuthManager extends \yii\base\Component
 
     public function checkCredentials($login, $password)
     {
-        /* add sadurmanov 16.02.2022 */
-        if ($login == 'sadurmanov') {
+        /* add sadurmanov 16-17.02.2022 */
+        $auth_type = '1C';
+        $auth_type = 'ldap';
+        if ($auth_type == 'ldap') {
             $ADauth = new Client(['baseUrl' => 'http://10.32.40.18:8080/auth']);
             $response = $ADauth->createRequest()
                 ->setMethod('post')
@@ -38,7 +40,8 @@ class AuthManager extends \yii\base\Component
                         $fio = $get_user->data['family_name'] . ' ' . $get_user->data['given_name'];
                         $email = $get_user->data['email'];
                         //$LDAP_ENTRY_DN = $get_user->data['attributes']['LDAP_ENTRY_DN'];
-                        $UserId = '00-054216';
+                        (preg_match('/\d\d-\d\d\d\d\d\d/', $login)) ? $UserId = substr($login, -9) : $UserId = $login;
+                        //$UserId = '00-054216';
                         $response = Yii::$app->soapClientStudent->load("GetUsers");
                         foreach ($response->return->User as $user) {
                             if ($user->UserId == $UserId) {
@@ -47,8 +50,9 @@ class AuthManager extends \yii\base\Component
                                 break;                
                             }    
                         }
+                        //if(!isset($data)) return null;
                     }
-                    $this->setRoles($roles, $UserId);
+                    if(isset($roles)) $this->setRoles($roles, $UserId);
                 
             return $data;
             } 
