@@ -54,11 +54,13 @@ class AuthManager extends \yii\base\Component
                             }
                         }
                     }
-                $data = json_decode(json_encode([ 'UserId'  => $user,
-                    'Login'   => $fio,
-                    'PasswordHash' => '',
-                    'Roles' => $roles_list
-                ])); 
+                if (isset($roles_list)){    
+                    $data = json_decode(json_encode([ 'UserId'  => $user,
+                        'Login'   => $fio,
+                        'PasswordHash' => '',
+                        'Roles' => $roles_list
+                    ])); 
+                } else {$data = 'noroles'}
             }
         }
         return $data;
