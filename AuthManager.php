@@ -15,6 +15,54 @@ class AuthManager extends \yii\base\Component
     public $serviceUrl;
 
     protected $client;
+    
+    protected function getRolesAd($user)
+    {
+        /**/
+        $ADauth = new Client(['baseUrl' => 'http://10.32.40.18:8080/auth']);
+        $response = $ADauth->createRequest()
+                ->setMethod('post')
+                ->setUrl('/realms/master/protocol/openid-connect/token')
+                ->setData(['grant_type' => 'password', 'username' => 'admin', 'password' => 'Admin@123', 'client_id' => 'admin-cli', 'client_secret' => 'BtutKKFBapkIwcSNlfL8SuzdYNH7cVws'])
+                ->send();
+        $access_token = $response->data['access_token'];
+        if ($response->isOk) {
+            $get_user = $ADauth->createRequest()
+                ->setFormat(Client::FORMAT_JSON)
+                ->setMethod('get')
+                ->setUrl('/admin/realms/PortalSEVSU/users?username='.$user)
+                ->addHeaders(['Authorization' => 'Bearer ' . $access_token])
+                ->send();
+            //Yii::warning($access_token, 'debug');
+            if ($get_user->isOk) {
+                $id = $get_user->data[0]['id'];
+                $fio = $get_user->data[0]['lastName'] . ' ' . $get_user->data[0]['firstName'];
+                $user_name = $get_user->data[0]['username'];
+                $email = $get_user->data[0]['email'];
+                ///Yii::warning($email, 'debug');
+                $get_roles = $ADauth->createRequest()
+                    ->setFormat(Client::FORMAT_JSON)
+                    ->setMethod('get')
+                    ->setUrl('/admin/realms/PortalSEVSU/users/' . $id .'/role-mappings/realm')
+                    ->addHeaders(['Authorization' => 'Bearer ' . $access_token])
+                    ->send();
+                    if ($get_roles->isOk) {
+                        foreach ($get_roles->data as $role) {
+                            if($role['description'] == '1CPortal'){
+                                $roles_list[] = ['Role'=>$role['name']];
+                                //Yii::warning($role['name'], 'debug');
+                            }
+                        }
+                    }
+                $data = json_decode(json_encode([ 'UserId'  => $user,
+                    'Login'   => $fio,
+                    'PasswordHash' => '',
+                    'Roles' => $roles_list
+                ])); 
+            }
+        }
+        return $data;
+    }
 
     public function checkCredentials($login, $password)
     {
@@ -29,32 +77,8 @@ class AuthManager extends \yii\base\Component
                 ->setData(['grant_type' => 'password', 'username' => $login, 'password' => $password, 'client_id' => 'lk-sevsu', 'client_secret' => 'jPZPsFE21Vsx57yAVOBMfzcTHcNXBMf8'])
                 ->send();
             if ($response->isOk) {
-                $access_token = $response->data['access_token'];
-                $get_user = $ADauth->createRequest()
-                    ->setFormat(Client::FORMAT_JSON)
-                    ->setMethod('get')
-                    ->setUrl('/realms/PortalSEVSU/protocol/openid-connect/userinfo')
-                    ->addHeaders(['Authorization' => 'Bearer ' . $access_token])
-                    ->send();
-                    if ($get_user->isOk) {
-                        $fio = $get_user->data['family_name'] . ' ' . $get_user->data['given_name'];
-                        $email = $get_user->data['email'];
-                        //$LDAP_ENTRY_DN = $get_user->data['attributes']['LDAP_ENTRY_DN'];
-                        (preg_match('/\d\d-\d\d\d\d\d\d/', $login)) ? $UserId = substr($login, -9) : $UserId = $login;
-                        //$UserId = '00-054216';
-                        $response = Yii::$app->soapClientStudent->load("GetUsers");
-                        foreach ($response->return->User as $user) {
-                            if ($user->UserId == $UserId) {
-                                $roles = $user->Roles;
-                                $data =  $user;
-                                break;                
-                            }    
-                        }
-                        //if(!isset($data)) return null;
-                    }
-                    if(isset($roles)) $this->setRoles($roles, $UserId);
-                
-            return $data;
+                $data = $this->getRolesAd($login);
+                return $data;
             } 
             else {
                 return null;
