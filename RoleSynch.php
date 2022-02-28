@@ -51,14 +51,13 @@ function get_list_users(){
         'Content-Type: application/xml'
         ),
     ));
-
     $response = curl_exec($curl);
-    
-    $DOMxml = new DOMDocument();
-    $DOMxml->loadXML($response);
-    $result = $DOMxml->getElementsByTagName("Envelope")->item(0)->getElementsByTagName("Body")->item(0)->getElementsByTagName("GetUsersResponse")->item(0)->getElementsByTagName("return")->item(0)->getElementsByTagName("User");
+
+    $res = substr($response, strripos($response, 'return xmlns')-3, -54);
+    $result = (array)json_decode(json_encode(simplexml_load_string($res)), true);
     curl_close($curl);
     return $result;
+
 }
 
 function find_user($user_name, $token){
@@ -171,9 +170,9 @@ function set_role_user($role_id, $role_name, $user_id, $token){
 
 }
 
-$users_1c = get_list_users();
+$users = get_list_users();
 $i = 0;
-
+/*
 foreach ($users_1c as $user) {
     if ($user->getElementsByTagName("Roles")->length>0){
         $i++;
@@ -192,3 +191,21 @@ foreach ($users_1c as $user) {
     else {  $info = 'Not role!';}
 
 } echo "DONE! ". $i . "roles reloaded.";
+*/
+foreach ($users['m:User'] as $user) {
+
+    if (isset($user['m:Roles'])){
+        $i++;
+        $UserId = $user['m:UserId'];
+        if ($i > 10000) break;
+        foreach($user["m:Roles"] as $role){
+            $role_name =  $role["m:Role"];
+            $token = get_token();
+            $id_role = get_id_role($role_name, $token);
+            $id_user = find_user($UserId, $token);
+            set_role_user($id_role, $role_name, $id_user, $token);
+        }
+    }
+    else {  $info = 'Not role!';}
+
+} echo "DONE! ". $i . " roles reloaded.";
