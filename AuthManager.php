@@ -39,7 +39,6 @@ class AuthManager extends \yii\base\Component
                 $fio = $get_user->data[0]['lastName'] . ' ' . $get_user->data[0]['firstName'];
                 $user_name = $get_user->data[0]['username'];
                 $email = $get_user->data[0]['email'];
-                ///Yii::warning($email, 'debug');
                 $get_roles = $ADauth->createRequest()
                     ->setFormat(Client::FORMAT_JSON)
                     ->setMethod('get')
@@ -50,28 +49,30 @@ class AuthManager extends \yii\base\Component
                         foreach ($get_roles->data as $role) {
                             if($role['description'] == '1CPortal'){
                                 $roles_list[] = ['Role'=>$role['name']];
-                                //Yii::warning($role['name'], 'debug');
                             }
                         }
                     }
                 if (isset($roles_list)){    
-                    $data = json_decode(json_encode([ 'UserId'  => $user,
+                    (preg_match('/\d\d-\d\d\d\d\d\d/', $user)) ? $IdUser = substr($login, -9) : $IdUser = $user;
+                    $data = json_decode(json_encode([ 'UserId'  => $
+                    ,
                         'Login'   => $fio,
                         'PasswordHash' => '',
                         'Roles' => $roles_list
-                    ])); 
-                } else {$data = 'noroles'}
+                    ]));
+                    $this->setRoles($data->Roles, $data->UserId); 
+                } else {return 'norole';}
             }
         }
         return $data;
     }
 
-    public function checkCredentials($login, $password)
+    public function checkCredentials($login, $password, $isAD)
     {
         /* add sadurmanov 16-17.02.2022 */
         $auth_type = '1C';
         $auth_type = 'ldap';
-        if ($auth_type == 'ldap') {
+        if ($isAD) {
             $ADauth = new Client(['baseUrl' => 'http://10.32.40.18:8080/auth']);
             $response = $ADauth->createRequest()
                 ->setMethod('post')
